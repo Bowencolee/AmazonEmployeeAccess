@@ -7,9 +7,12 @@ library(tidymodels)
 library(vroom)
 library(ggmosaic)
 
-amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv")
+amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv") %>%
+  mutate(ACTION = as.factor(ACTION))
 amazon_test <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/test.csv")
 
+
+##### EDA #####
 vars_to_convert <- c("RESOURCE", "MGR_ID", "ROLE_ROLLUP_1",
                      "ROLE_ROLLUP_2", "ROLE_DEPTNAME", "ROLE_TITLE",
                      "ROLE_FAMILY_DESC", "ROLE_FAMILY", "ROLE_CODE")
@@ -17,7 +20,6 @@ vars_to_convert <- c("RESOURCE", "MGR_ID", "ROLE_ROLLUP_1",
 amazon_train[vars_to_convert] <- lapply(amazon_train[vars_to_convert], as.factor)
 amazon_test[vars_to_convert] <- lapply(amazon_test[vars_to_convert], as.factor)
 
-##### EDA #####
 ggplot(data=amazon_train) + 
   geom_boxplot(aes(x=RESOURCE, y=ACTION))
 
@@ -34,4 +36,23 @@ my_recipe <- recipe(ACTION~., data=amazon_train) %>%
 
 
 prepped_recipe <- prep(my_recipe)
-baked_recipe <- bake(prepped_recipe, amazon_train)
+baked_recipe <- bake(prepped_recipe, amazon_test)
+
+
+##### Logistic Regression #####
+
+logReg_mod <- logistic_reg() %>% #Type of model
+                set_engine("glm")
+
+logReg_wf <- workflow() %>%
+              add_recipe(my_recipe) %>%
+              add_model(logReg_mod) %>%
+              fit(data = amazon_train) # Fit the workflow
+
+logReg_preds <- predict(logReg_wf, new_data=amazon_test,type="prob") %>%
+  bind_cols(., amazon_test) %>% #Bind predictions with test data
+  select(id, .pred_1) %>% #Just keep resource and predictions
+  rename(Action=.pred_1)
+
+vroom_write(x=logReg_preds, file="./amazon_logReg.csv", delim=",")
+
