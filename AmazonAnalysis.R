@@ -2,10 +2,10 @@
 ## Amazon Employee Access
 ##
 
-library(tidyverse)
 library(tidymodels)
 library(vroom)
-library(ggmosaic)
+library(embed) # target encoding
+#library(glmnet) # penalized log regression
 
 amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv") %>%
   mutate(ACTION = as.factor(ACTION))
@@ -29,9 +29,9 @@ ggplot(data=amazon_train) +
 
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
-              step_other(all_nominal_predictors(), threshold = .01) %>% # combines categorical values that occur <5% into an "other" value
-              step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
-              # step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+              step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
+              # step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
+              step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
               # also step_lencode_glm() and step_lencode_bayes()
 
 
@@ -56,3 +56,39 @@ logReg_preds <- predict(logReg_wf, new_data=amazon_test,type="prob") %>%
 
 vroom_write(x=logReg_preds, file="./amazon_logReg.csv", delim=",")
 
+
+##### Penalized Logistic Regression #####
+
+penLog_mod <- logistic_reg(mixture = tune(),
+                           penalty = tune()) %>% #Type of model
+                set_engine("glmnet")
+
+penLog_wf <- workflow() %>%
+              add_recipe(my_recipe) %>%
+              add_model(penLog_mod) %>%
+              fit(data = amazon_train)
+
+tuning_grid <- grid_regular(penalty(),
+                            mixture(),
+                            levels = 10)
+
+folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
+
+CV_results <- penLog_wf %>%
+                tune_grid(resamples=folds,
+                          grid=tuning_grid,
+                          metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+
+bestTune <- CV_results %>%
+              select_best("roc_auc")
+
+final_wf <- penLog_wf %>%
+              finalize_workflow(bestTune) %>%
+              fit(data=amazon_train)
+
+penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+  bind_cols(., amazon_test) %>% #Bind predictions with test data
+  select(id, .pred_1) %>% #Just keep resource and predictions
+  rename(Action=.pred_1)
+
+vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
