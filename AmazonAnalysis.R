@@ -4,7 +4,7 @@
 
 library(tidymodels)
 library(vroom)
-library(embed) # target encoding
+#library(embed) # target encoding
 #library(glmnet) # penalized log regression
 
 amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv") %>%
@@ -13,15 +13,15 @@ amazon_test <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess
 
 
 ##### EDA #####
-vars_to_convert <- c("RESOURCE", "MGR_ID", "ROLE_ROLLUP_1",
-                     "ROLE_ROLLUP_2", "ROLE_DEPTNAME", "ROLE_TITLE",
-                     "ROLE_FAMILY_DESC", "ROLE_FAMILY", "ROLE_CODE")
-
-amazon_train[vars_to_convert] <- lapply(amazon_train[vars_to_convert], as.factor)
-amazon_test[vars_to_convert] <- lapply(amazon_test[vars_to_convert], as.factor)
-
-ggplot(data=amazon_train) + 
-  geom_boxplot(aes(x=RESOURCE, y=ACTION))
+# vars_to_convert <- c("RESOURCE", "MGR_ID", "ROLE_ROLLUP_1",
+#                      "ROLE_ROLLUP_2", "ROLE_DEPTNAME", "ROLE_TITLE",
+#                      "ROLE_FAMILY_DESC", "ROLE_FAMILY", "ROLE_CODE")
+# 
+# amazon_train[vars_to_convert] <- lapply(amazon_train[vars_to_convert], as.factor)
+# amazon_test[vars_to_convert] <- lapply(amazon_test[vars_to_convert], as.factor)
+# 
+# ggplot(data=amazon_train) + 
+#   geom_boxplot(aes(x=RESOURCE, y=ACTION))
 
 
 
@@ -30,8 +30,8 @@ ggplot(data=amazon_train) +
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
               # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
-              # step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
-              step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+              step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
+              # step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
               # also step_lencode_glm() and step_lencode_bayes()
 
 
@@ -92,3 +92,6 @@ penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
   rename(Action=.pred_1)
 
 vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
+
+# save(file="filename.RData", list=c("logReg_wf"))
+# load("filename.RData")
