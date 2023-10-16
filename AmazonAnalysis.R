@@ -7,8 +7,9 @@ library(vroom)
 library(embed) # target encoding
 library(glmnet) # penalized log regression
 
+# setwd("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess")
 amazon_train <- vroom::vroom("train.csv") %>%
-  mutate(ACTION = as.factor(ACTION))
+  mutate(ACTION = as.factor(ACTION)) # need to fix ^^ for Becker/BATCH
 amazon_test <- vroom::vroom("test.csv")
 
 
