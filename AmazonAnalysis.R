@@ -4,8 +4,8 @@
 
 library(tidymodels)
 library(vroom)
-#library(embed) # target encoding
-#library(glmnet) # penalized log regression
+library(embed) # target encoding
+library(glmnet) # penalized log regression
 
 amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv") %>%
   mutate(ACTION = as.factor(ACTION))
@@ -30,8 +30,8 @@ amazon_test <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
               # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
-              step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
-              # step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+              # step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
+              step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
               # also step_lencode_glm() and step_lencode_bayes()
 
 
