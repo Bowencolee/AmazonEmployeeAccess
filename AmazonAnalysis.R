@@ -7,9 +7,9 @@ library(vroom)
 library(embed) # target encoding
 library(glmnet) # penalized log regression
 
-amazon_train <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/train.csv") %>%
+amazon_train <- vroom::vroom("train.csv") %>%
   mutate(ACTION = as.factor(ACTION))
-amazon_test <- vroom::vroom("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess/test.csv")
+amazon_test <- vroom::vroom("test.csv")
 
 
 ##### EDA #####
