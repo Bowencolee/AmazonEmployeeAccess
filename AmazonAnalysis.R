@@ -8,6 +8,7 @@ library(embed) # target encoding
 library(glmnet) # penalized log regression
 library(ranger) # random forests
 library(discrim) # naive bayes
+library(kknn) # KNN
 
 # setwd("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess")
 amazon_train <- vroom::vroom("train.csv") %>%
@@ -32,6 +33,7 @@ amazon_test <- vroom::vroom("test.csv")
 
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
+              step_normalize(all_numeric_predictors()) %>%
               # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
               # step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
               step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
@@ -43,119 +45,153 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 
 
 ##### Logistic Regression #####
+# 
+# logReg_mod <- logistic_reg() %>% #Type of model
+#                 set_engine("glm")
+# 
+# logReg_wf <- workflow() %>%
+#               add_recipe(my_recipe) %>%
+#               add_model(logReg_mod) %>%
+#               fit(data = amazon_train) # Fit the workflow
+# 
+# logReg_preds <- predict(logReg_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
 
-logReg_mod <- logistic_reg() %>% #Type of model
-                set_engine("glm")
-
-logReg_wf <- workflow() %>%
-              add_recipe(my_recipe) %>%
-              add_model(logReg_mod) %>%
-              fit(data = amazon_train) # Fit the workflow
-
-logReg_preds <- predict(logReg_wf, new_data=amazon_test,type="prob") %>%
-  bind_cols(., amazon_test) %>% #Bind predictions with test data
-  select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-
-vroom_write(x=logReg_preds, file="./amazon_logReg.csv", delim=",")
+#vroom_write(x=logReg_preds, file="./amazon_logReg.csv", delim=",")
 
 
 ##### Penalized Logistic Regression #####
+# 
+# penLog_mod <- logistic_reg(mixture = tune(),
+#                            penalty = tune()) %>% #Type of model
+#                 set_engine("glmnet")
+# 
+# penLog_wf <- workflow() %>%
+#               add_recipe(my_recipe) %>%
+#               add_model(penLog_mod) %>%
+#               fit(data = amazon_train)
+# 
+# tuning_grid <- grid_regular(penalty(),
+#                             mixture(),
+#                             levels = 5)
+# 
+# folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
+# 
+# CV_results <- penLog_wf %>%
+#                 tune_grid(resamples=folds,
+#                           grid=tuning_grid,
+#                           metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#               select_best("roc_auc")
+# 
+# final_wf <- penLog_wf %>%
+#               finalize_workflow(bestTune) %>%
+#               fit(data=amazon_train)
+# 
+# penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
 
-penLog_mod <- logistic_reg(mixture = tune(),
-                           penalty = tune()) %>% #Type of model
-                set_engine("glmnet")
-
-penLog_wf <- workflow() %>%
-              add_recipe(my_recipe) %>%
-              add_model(penLog_mod) %>%
-              fit(data = amazon_train)
-
-tuning_grid <- grid_regular(penalty(),
-                            mixture(),
-                            levels = 5)
-
-folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
-
-CV_results <- penLog_wf %>%
-                tune_grid(resamples=folds,
-                          grid=tuning_grid,
-                          metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
-
-bestTune <- CV_results %>%
-              select_best("roc_auc")
-
-final_wf <- penLog_wf %>%
-              finalize_workflow(bestTune) %>%
-              fit(data=amazon_train)
-
-penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-  bind_cols(., amazon_test) %>% #Bind predictions with test data
-  select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-
-vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
+#vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
 
 # save(file="filename.RData", list=c("logReg_wf"))
 # load("filename.RData")
 
 ##### Classification Random Forests #####
+# 
+# classForest_model <- rand_forest(mtry = tune(), # how many var are considered
+#                             min_n=tune(), # how many observations per leaf
+#                             trees=500) %>% #Type of model
+#   set_engine("ranger") %>% # What R function to use
+#   set_mode("classification")
+# 
+# ## Set Workflow
+# classForest_wf <- workflow() %>%
+#                   add_recipe(my_recipe) %>%
+#                   add_model(classForest_model)
+# 
+# ## Grid of values to tune over
+# tuning_grid <- grid_regular(mtry(range =c(1,5)),
+#                             min_n(),
+#                             levels = 6) ## L^2 total tuning possibilities
+# 
+# ## Split data for CV
+# folds <- vfold_cv(amazon_train, v = 6, repeats=1)
+# 
+# CV_results <- classForest_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=tuning_grid,
+#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#   select_best("roc_auc")
+# 
+# final_wf <- classForest_wf %>%
+#   finalize_workflow(bestTune) %>%
+#   fit(data=amazon_train)
+# 
+# classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
 
-classForest_model <- rand_forest(mtry = tune(), # how many var are considered
-                            min_n=tune(), # how many observations per leaf
-                            trees=500) %>% #Type of model
-  set_engine("ranger") %>% # What R function to use
-  set_mode("classification")
-
-## Set Workflow
-classForest_wf <- workflow() %>%
-                  add_recipe(my_recipe) %>%
-                  add_model(classForest_model)
-
-## Grid of values to tune over
-tuning_grid <- grid_regular(mtry(range =c(1,5)),
-                            min_n(),
-                            levels = 6) ## L^2 total tuning possibilities
-
-## Split data for CV
-folds <- vfold_cv(amazon_train, v = 6, repeats=1)
-
-CV_results <- classForest_wf %>%
-  tune_grid(resamples=folds,
-            grid=tuning_grid,
-            metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
-
-bestTune <- CV_results %>%
-  select_best("roc_auc")
-
-final_wf <- classForest_wf %>%
-  finalize_workflow(bestTune) %>%
-  fit(data=amazon_train)
-
-classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-  bind_cols(., amazon_test) %>% #Bind predictions with test data
-  select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-
-vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
+#vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 
 ##### Naive Bayes #####
+# 
+# nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+#               set_mode("classification") %>%
+#               set_engine("naivebayes")
+# 
+# nb_wf <- workflow() %>%
+#           add_recipe(my_recipe) %>%
+#           add_model(nb_model)
+# 
+# tuning_grid <- grid_regular(Laplace(),
+#                             smoothness(),
+#                             levels = 5)
+# 
+# folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
+# 
+# CV_results <- nb_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=tuning_grid,
+#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#   select_best("roc_auc")
+# 
+# final_wf <- nb_wf %>%
+#   finalize_workflow(bestTune) %>%
+#   fit(data=amazon_train)
+# 
+# nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
 
-nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+#vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
+
+##### K-Nearest Neighbors #####
+
+knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
               set_mode("classification") %>%
-              set_engine("naivebayes")
+              set_engine("kknn")
 
-nb_wf <- workflow() %>%
+knn_wf <- workflow() %>%
           add_recipe(my_recipe) %>%
-          add_model(nb_model)
+          add_model(knn_model)
 
-tuning_grid <- grid_regular(Laplace(),
-                            smoothness(),
+tuning_grid <- grid_regular(neighbors(),
                             levels = 5)
 
 folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
 
-CV_results <- nb_wf %>%
+CV_results <- knn_wf %>%
   tune_grid(resamples=folds,
             grid=tuning_grid,
             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
@@ -163,13 +199,13 @@ CV_results <- nb_wf %>%
 bestTune <- CV_results %>%
   select_best("roc_auc")
 
-final_wf <- nb_wf %>%
+final_wf <- knn_wf %>%
   finalize_workflow(bestTune) %>%
   fit(data=amazon_train)
 
-nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+knn_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
   bind_cols(., amazon_test) %>% #Bind predictions with test data
   select(id, .pred_1) %>% #Just keep resource and predictions
   rename(Action=.pred_1)
 
-vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
+vroom_write(x=knn_preds, file="./amazon_KNN.csv", delim=",")
