@@ -5,10 +5,12 @@
 library(tidymodels)
 library(vroom)
 library(embed) # target encoding
+
 library(glmnet) # penalized log regression
 library(ranger) # random forests
 library(discrim) # naive bayes
 library(kknn) # KNN
+library(kernlab) # SVM
 
 # setwd("C:/Users/bowen/Desktop/Stat348/AmazonEmployeeAccess")
 amazon_train <- vroom::vroom("train.csv") %>%
@@ -38,7 +40,7 @@ my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               # step_dummy(all_nominal_predictors()) # %>% # dummy variable encoding
               step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>% #target encoding
               step_normalize(all_numeric_predictors()) %>%
-              step_pca(all_predictors(),threshold = .85) # principle component reduction
+              step_pca(all_predictors(),threshold = .9) # principle component reduction
               # also step_lencode_glm(), step_lencode_bayes(), and step_lencode_mixed()
 
 
@@ -144,56 +146,102 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 #vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 
 ##### Naive Bayes #####
-
-nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
-             set_mode("classification") %>%
-             set_engine("naivebayes")
-
-nb_wf <- workflow() %>%
-         add_recipe(my_recipe) %>%
-         add_model(nb_model)
-
-tuning_grid <- grid_regular(Laplace(),
-                            smoothness(),
-                            levels = 5)
-
-folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
-
-CV_results <- nb_wf %>%
-  tune_grid(resamples=folds,
-            grid=tuning_grid,
-            metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
-
-bestTune <- CV_results %>%
-  select_best("roc_auc")
-
-final_wf <- nb_wf %>%
- finalize_workflow(bestTune) %>%
- fit(data=amazon_train)
-
-nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-  bind_cols(., amazon_test) %>% #Bind predictions with test data
-  select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-
-vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
+# 
+# nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+#              set_mode("classification") %>%
+#              set_engine("naivebayes")
+# 
+# nb_wf <- workflow() %>%
+#          add_recipe(my_recipe) %>%
+#          add_model(nb_model)
+# 
+# tuning_grid <- grid_regular(Laplace(),
+#                             smoothness(),
+#                             levels = 10)
+# 
+# folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
+# 
+# CV_results <- nb_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=tuning_grid,
+#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#   select_best("roc_auc")
+# 
+# final_wf <- nb_wf %>%
+#  finalize_workflow(bestTune) %>%
+#  fit(data=amazon_train)
+# 
+# nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
+# 
+# vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
 
 ##### K-Nearest Neighbors #####
+# 
+# knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
+#               set_mode("classification") %>%
+#               set_engine("kknn")
+# 
+# knn_wf <- workflow() %>%
+#           add_recipe(my_recipe) %>%
+#           add_model(knn_model)
+# 
+# tuning_grid <- grid_regular(neighbors(),
+#                             levels = 10)
+# 
+# folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
+# 
+# CV_results <- knn_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=tuning_grid,
+#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#   select_best("roc_auc")
+# 
+# final_wf <- knn_wf %>%
+#   finalize_workflow(bestTune) %>%
+#   fit(data=amazon_train)
+# 
+# knn_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
+# 
+# vroom_write(x=knn_preds, file="./amazon_KNN.csv", delim=",")
+# 
 
-knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
+
+
+##### Support Vector Machines #####
+
+## SVM models
+# svmLinear <- svm_linear(cost=tune()) %>% # set or tune
+#   set_mode("classification") %>%
+# set_engine("kernlab")
+# 
+# svmPoly <- svm_poly(degree=tune(), cost=tune()) %>% # set or tune
+#   set_mode("classification") %>%
+# set_engine("kernlab")
+
+svmRadial_model <- svm_rbf(rbf_sigma=tune(), cost=tune()) %>% # set or tune
               set_mode("classification") %>%
-              set_engine("kknn")
+              set_engine("kernlab")
 
-knn_wf <- workflow() %>%
-          add_recipe(my_recipe) %>%
-          add_model(knn_model)
+svm_wf <- workflow() %>%
+  add_recipe(my_recipe) %>%
+  add_model(svmRadial_model)
 
 tuning_grid <- grid_regular(neighbors(),
-                            levels = 5)
+                            levels = 10)
 
-folds <- vfold_cv(amazon_train, v = 5, repeats = 1)
+folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
 
-CV_results <- knn_wf %>%
+CV_results <- svm_wf %>%
   tune_grid(resamples=folds,
             grid=tuning_grid,
             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
@@ -201,16 +249,13 @@ CV_results <- knn_wf %>%
 bestTune <- CV_results %>%
   select_best("roc_auc")
 
-final_wf <- knn_wf %>%
+final_wf <- svm_wf %>%
   finalize_workflow(bestTune) %>%
   fit(data=amazon_train)
 
-knn_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+svm_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
   bind_cols(., amazon_test) %>% #Bind predictions with test data
   select(id, .pred_1) %>% #Just keep resource and predictions
   rename(Action=.pred_1)
 
-vroom_write(x=knn_preds, file="./amazon_KNN.csv", delim=",")
-
-
-
+vroom_write(x=svm_preds, file="./amazon_SVM.csv", delim=",")
