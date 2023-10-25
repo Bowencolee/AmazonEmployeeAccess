@@ -236,7 +236,8 @@ svm_wf <- workflow() %>%
   add_recipe(my_recipe) %>%
   add_model(svmRadial_model)
 
-tuning_grid <- grid_regular(neighbors(),
+tuning_grid <- grid_regular(rbf_sigma(),
+                            cost(),
                             levels = 10)
 
 folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
