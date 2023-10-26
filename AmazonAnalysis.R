@@ -238,9 +238,9 @@ svm_wf <- workflow() %>%
 
 tuning_grid <- grid_regular(rbf_sigma(),
                             cost(),
-                            levels = 10)
+                            levels = 3)
 
-folds <- vfold_cv(amazon_train, v = 10, repeats = 1)
+folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
 
 CV_results <- svm_wf %>%
   tune_grid(resamples=folds,
