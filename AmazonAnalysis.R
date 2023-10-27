@@ -44,8 +44,8 @@ my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               # also step_lencode_glm(), step_lencode_bayes(), and step_lencode_mixed()
 
 
-prepped_recipe <- prep(my_recipe)
-baked_recipe <- bake(prepped_recipe, amazon_test)
+# prepped_recipe <- prep(my_recipe)
+# baked_recipe <- bake(prepped_recipe, amazon_test)
 
 
 ##### Logistic Regression #####
@@ -106,44 +106,44 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 # load("filename.RData")
 
 ##### Classification Random Forests #####
-# 
-# classForest_model <- rand_forest(mtry = tune(), # how many var are considered
-#                             min_n=tune(), # how many observations per leaf
-#                             trees=500) %>% #Type of model
-#   set_engine("ranger") %>% # What R function to use
-#   set_mode("classification")
-# 
-# ## Set Workflow
-# classForest_wf <- workflow() %>%
-#                   add_recipe(my_recipe) %>%
-#                   add_model(classForest_model)
-# 
-# ## Grid of values to tune over
-# tuning_grid <- grid_regular(mtry(range =c(1,5)),
-#                             min_n(),
-#                             levels = 6) ## L^2 total tuning possibilities
-# 
-# ## Split data for CV
-# folds <- vfold_cv(amazon_train, v = 6, repeats=1)
-# 
-# CV_results <- classForest_wf %>%
-#   tune_grid(resamples=folds,
-#             grid=tuning_grid,
-#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
-# 
-# bestTune <- CV_results %>%
-#   select_best("roc_auc")
-# 
-# final_wf <- classForest_wf %>%
-#   finalize_workflow(bestTune) %>%
-#   fit(data=amazon_train)
-# 
-# classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-#   bind_cols(., amazon_test) %>% #Bind predictions with test data
-#   select(id, .pred_1) %>% #Just keep resource and predictions
-#   rename(Action=.pred_1)
 
-#vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
+ classForest_model <- rand_forest(mtry = tune(), # how many var are considered
+                             min_n=tune(), # how many observations per leaf
+                             trees=500) %>% #Type of model
+   set_engine("ranger") %>% # What R function to use
+   set_mode("classification")
+
+ ## Set Workflow
+ classForest_wf <- workflow() %>%
+                   add_recipe(my_recipe) %>%
+                   add_model(classForest_model)
+
+ ## Grid of values to tune over
+ tuning_grid <- grid_regular(mtry(range =c(1,5)),
+                             min_n(),
+                             levels = 6) ## L^2 total tuning possibilities
+
+ ## Split data for CV
+ folds <- vfold_cv(amazon_train, v = 6, repeats=1)
+
+ CV_results <- classForest_wf %>%
+   tune_grid(resamples=folds,
+             grid=tuning_grid,
+             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+
+ bestTune <- CV_results %>%
+   select_best("roc_auc")
+
+ final_wf <- classForest_wf %>%
+   finalize_workflow(bestTune) %>%
+   fit(data=amazon_train)
+
+ classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+   bind_cols(., amazon_test) %>% #Bind predictions with test data
+   select(id, .pred_1) %>% #Just keep resource and predictions
+ rename(Action=.pred_1)
+
+vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 
 ##### Naive Bayes #####
 # 
@@ -228,35 +228,35 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 #   set_mode("classification") %>%
 # set_engine("kernlab")
 
-svmRadial_model <- svm_rbf(rbf_sigma=tune(), cost=tune()) %>% # set or tune
-              set_mode("classification") %>%
-              set_engine("kernlab")
-
-svm_wf <- workflow() %>%
-  add_recipe(my_recipe) %>%
-  add_model(svmRadial_model)
-
-tuning_grid <- grid_regular(rbf_sigma(),
-                            cost(),
-                            levels = 3)
-
-folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
-
-CV_results <- svm_wf %>%
-  tune_grid(resamples=folds,
-            grid=tuning_grid,
-            metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
-
-bestTune <- CV_results %>%
-  select_best("roc_auc")
-
-final_wf <- svm_wf %>%
-  finalize_workflow(bestTune) %>%
-  fit(data=amazon_train)
-
-svm_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-  bind_cols(., amazon_test) %>% #Bind predictions with test data
-  select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-
-vroom_write(x=svm_preds, file="./amazon_SVM.csv", delim=",")
+# svmRadial_model <- svm_rbf(rbf_sigma=tune(), cost=tune()) %>% # set or tune
+#               set_mode("classification") %>%
+#               set_engine("kernlab")
+# 
+# svm_wf <- workflow() %>%
+#   add_recipe(my_recipe) %>%
+#   add_model(svmRadial_model)
+# 
+# tuning_grid <- grid_regular(rbf_sigma(),
+#                             cost(),
+#                             levels = 3)
+# 
+# folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
+# 
+# CV_results <- svm_wf %>%
+#   tune_grid(resamples=folds,
+#             grid=tuning_grid,
+#             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+# 
+# bestTune <- CV_results %>%
+#   select_best("roc_auc")
+# 
+# final_wf <- svm_wf %>%
+#   finalize_workflow(bestTune) %>%
+#   fit(data=amazon_train)
+# 
+# svm_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#   bind_cols(., amazon_test) %>% #Bind predictions with test data
+#   select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
+# 
+# vroom_write(x=svm_preds, file="./amazon_SVM.csv", delim=",")
