@@ -36,10 +36,10 @@ amazon_test <- vroom::vroom("test.csv")
 
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
-              step_normalize(all_numeric_predictors()) %>%
               step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
-              #step_pca(all_predictors(),threshold = .6) %>%
-              step_smote(all_outcomes(), neighbors = 5)
+              step_normalize(all_predictors()) %>%
+              step_pca(all_predictors(),threshold = .9) %>%
+              step_smote(all_outcomes(), neighbors = 7)
 
 
               # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
@@ -124,11 +124,11 @@ classForest_wf <- workflow() %>%
  
 tuning_grid <- grid_regular(mtry(range =c(1,5)),
                              min_n(),
-                             levels = 3) ## L^2 total tuning possibilities
+                             levels = 5) ## L^2 total tuning possibilities
 
  ## Split data for CV
  
-folds <- vfold_cv(amazon_train, v = 3, repeats=1)
+folds <- vfold_cv(amazon_train, v = 5, repeats=1)
 
  
 CV_results <- classForest_wf %>%
@@ -154,74 +154,74 @@ classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
 vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 
 ##### Naive Bayes #####
- 
- nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
-              set_mode("classification") %>%
-              set_engine("naivebayes")
- 
- nb_wf <- workflow() %>%
-          add_recipe(my_recipe) %>%
-          add_model(nb_model)
- 
- tuning_grid <- grid_regular(Laplace(),
-                             smoothness(),
-                             levels = 3)
- 
- folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
- 
- CV_results <- nb_wf %>%
-   tune_grid(resamples=folds,
-             grid=tuning_grid,
-             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
- 
- bestTune <- CV_results %>%
-   select_best("roc_auc")
- 
- final_wf <- nb_wf %>%
-  finalize_workflow(bestTune) %>%
-  fit(data=amazon_train)
- 
- nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-   bind_cols(., amazon_test) %>% #Bind predictions with test data
-   select(id, .pred_1) %>% #Just keep resource and predictions
-   rename(Action=.pred_1)
- 
- vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
+ # 
+ # nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+ #              set_mode("classification") %>%
+ #              set_engine("naivebayes")
+ # 
+ # nb_wf <- workflow() %>%
+ #          add_recipe(my_recipe) %>%
+ #          add_model(nb_model)
+ # 
+ # tuning_grid <- grid_regular(Laplace(),
+ #                             smoothness(),
+ #                             levels = 3)
+ # 
+ # folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
+ # 
+ # CV_results <- nb_wf %>%
+ #   tune_grid(resamples=folds,
+ #             grid=tuning_grid,
+ #             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+ # 
+ # bestTune <- CV_results %>%
+ #   select_best("roc_auc")
+ # 
+ # final_wf <- nb_wf %>%
+ #  finalize_workflow(bestTune) %>%
+ #  fit(data=amazon_train)
+ # 
+ # nb_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+ #   bind_cols(., amazon_test) %>% #Bind predictions with test data
+ #   select(id, .pred_1) %>% #Just keep resource and predictions
+ #   rename(Action=.pred_1)
+ # 
+ # vroom_write(x=nb_preds, file="./amazon_naiveBayes.csv", delim=",")
 
 ##### K-Nearest Neighbors #####
- 
- knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
-               set_mode("classification") %>%
-               set_engine("kknn")
- 
- knn_wf <- workflow() %>%
-           add_recipe(my_recipe) %>%
-           add_model(knn_model)
- 
- tuning_grid <- grid_regular(neighbors(),
-                             levels = 3)
- 
- folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
- 
- CV_results <- knn_wf %>%
-   tune_grid(resamples=folds,
-             grid=tuning_grid,
-             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
- 
- bestTune <- CV_results %>%
-   select_best("roc_auc")
- 
- final_wf <- knn_wf %>%
-   finalize_workflow(bestTune) %>%
-   fit(data=amazon_train)
- 
- knn_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-   bind_cols(., amazon_test) %>% #Bind predictions with test data
-   select(id, .pred_1) %>% #Just keep resource and predictions
-   rename(Action=.pred_1)
- 
- vroom_write(x=knn_preds, file="./amazon_KNN.csv", delim=",")
- 
+ # 
+ # knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
+ #               set_mode("classification") %>%
+ #               set_engine("kknn")
+ # 
+ # knn_wf <- workflow() %>%
+ #           add_recipe(my_recipe) %>%
+ #           add_model(knn_model)
+ # 
+ # tuning_grid <- grid_regular(neighbors(),
+ #                             levels = 3)
+ # 
+ # folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
+ # 
+ # CV_results <- knn_wf %>%
+ #   tune_grid(resamples=folds,
+ #             grid=tuning_grid,
+ #             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+ # 
+ # bestTune <- CV_results %>%
+ #   select_best("roc_auc")
+ # 
+ # final_wf <- knn_wf %>%
+ #   finalize_workflow(bestTune) %>%
+ #   fit(data=amazon_train)
+ # 
+ # knn_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+ #   bind_cols(., amazon_test) %>% #Bind predictions with test data
+ #   select(id, .pred_1) %>% #Just keep resource and predictions
+ #   rename(Action=.pred_1)
+ # 
+ # vroom_write(x=knn_preds, file="./amazon_KNN.csv", delim=",")
+ # 
 
 
 
@@ -236,35 +236,35 @@ vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 #   set_mode("classification") %>%
 # set_engine("kernlab")
 
- svmRadial_model <- svm_rbf(rbf_sigma=tune(), cost=tune()) %>% # set or tune
-               set_mode("classification") %>%
-               set_engine("kernlab")
- 
- svm_wf <- workflow() %>%
-   add_recipe(my_recipe) %>%
-   add_model(svmRadial_model)
-
- tuning_grid <- grid_regular(rbf_sigma(),
-                             cost(),
-                             levels = 3)
- 
- folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
- 
- CV_results <- svm_wf %>%
-   tune_grid(resamples=folds,
-             grid=tuning_grid,
-             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
- 
- bestTune <- CV_results %>%
-   select_best("roc_auc")
- 
- final_wf <- svm_wf %>%
-   finalize_workflow(bestTune) %>%
-   fit(data=amazon_train)
- 
- svm_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-   bind_cols(., amazon_test) %>% #Bind predictions with test data
-   select(id, .pred_1) %>% #Just keep resource and predictions
-   rename(Action=.pred_1)
- 
- vroom_write(x=svm_preds, file="./amazon_SVM.csv", delim=",")
+ # svmRadial_model <- svm_rbf(rbf_sigma=tune(), cost=tune()) %>% # set or tune
+ #               set_mode("classification") %>%
+ #               set_engine("kernlab")
+ # 
+ # svm_wf <- workflow() %>%
+ #   add_recipe(my_recipe) %>%
+ #   add_model(svmRadial_model)
+ # 
+ # tuning_grid <- grid_regular(rbf_sigma(),
+ #                             cost(),
+ #                             levels = 3)
+ # 
+ # folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
+ # 
+ # CV_results <- svm_wf %>%
+ #   tune_grid(resamples=folds,
+ #             grid=tuning_grid,
+ #             metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+ # 
+ # bestTune <- CV_results %>%
+ #   select_best("roc_auc")
+ # 
+ # final_wf <- svm_wf %>%
+ #   finalize_workflow(bestTune) %>%
+ #   fit(data=amazon_train)
+ # 
+ # svm_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+ #   bind_cols(., amazon_test) %>% #Bind predictions with test data
+ #   select(id, .pred_1) %>% #Just keep resource and predictions
+ #   rename(Action=.pred_1)
+ # 
+ # vroom_write(x=svm_preds, file="./amazon_SVM.csv", delim=",")
