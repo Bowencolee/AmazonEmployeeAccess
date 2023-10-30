@@ -38,7 +38,7 @@ my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
               step_normalize(all_numeric_predictors()) %>%
               step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
-              step_pca(all_predictors(),threshold = .9) %>%
+              #step_pca(all_predictors(),threshold = .6) %>%
               step_smote(all_outcomes(), neighbors = 5)
 
 
@@ -72,38 +72,38 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 
 ##### Penalized Logistic Regression #####
  
- penLog_mod <- logistic_reg(mixture = tune(),
-                            penalty = tune()) %>% #Type of model
-                 set_engine("glmnet")
- 
- penLog_wf <- workflow() %>%
-               add_recipe(my_recipe) %>%
-               add_model(penLog_mod) %>%
-               fit(data = amazon_train)
- 
- tuning_grid <- grid_regular(penalty(),
-                             mixture(),
-                             levels = 3)
- 
- folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
- 
- CV_results <- penLog_wf %>%
-                 tune_grid(resamples=folds,
-                           grid=tuning_grid,
-                           metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
- 
- bestTune <- CV_results %>%
-               select_best("roc_auc")
- 
- final_wf <- penLog_wf %>%
-               finalize_workflow(bestTune) %>%
-               fit(data=amazon_train)
- 
- penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
-   bind_cols(., amazon_test) %>% #Bind predictions with test data
-   select(id, .pred_1) %>% #Just keep resource and predictions
-  rename(Action=.pred_1)
-vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
+#  penLog_mod <- logistic_reg(mixture = tune(),
+#                             penalty = tune()) %>% #Type of model
+#                  set_engine("glmnet")
+#  
+#  penLog_wf <- workflow() %>%
+#                add_recipe(my_recipe) %>%
+#                add_model(penLog_mod) %>%
+#                fit(data = amazon_train)
+#  
+#  tuning_grid <- grid_regular(penalty(),
+#                              mixture(),
+#                              levels = 3)
+#  
+#  folds <- vfold_cv(amazon_train, v = 3, repeats = 1)
+#  
+#  CV_results <- penLog_wf %>%
+#                  tune_grid(resamples=folds,
+#                            grid=tuning_grid,
+#                            metrics=metric_set(roc_auc)) #f_meas,sens, recall,spec, precision, accuracy
+#  
+#  bestTune <- CV_results %>%
+#                select_best("roc_auc")
+#  
+#  final_wf <- penLog_wf %>%
+#                finalize_workflow(bestTune) %>%
+#                fit(data=amazon_train)
+#  
+#  penLog_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
+#    bind_cols(., amazon_test) %>% #Bind predictions with test data
+#    select(id, .pred_1) %>% #Just keep resource and predictions
+#   rename(Action=.pred_1)
+# vroom_write(x=penLog_preds, file="./amazon_penLog.csv", delim=",")
 
 
 ##### Classification Random Forests #####
