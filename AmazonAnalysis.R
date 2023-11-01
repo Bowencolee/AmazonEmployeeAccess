@@ -6,7 +6,7 @@ library(tidymodels)
 library(vroom)
 library(embed) # target encoding
 library(themis) # SMOTE/Balancing data
-library(doParallel) # Parallel processing
+#library(doParallel) # Parallel processing
 
 library(glmnet) # penalized log regression
 library(ranger) # random forests
@@ -38,9 +38,9 @@ amazon_test <- vroom::vroom("test.csv")
 my_recipe <- recipe(ACTION~., data=amazon_train) %>%
               step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
               step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
-              step_normalize(all_predictors()) %>%
-              step_pca(all_predictors(),threshold = .9) %>%
-              step_smote(all_outcomes(), neighbors = 5)
+              step_normalize(all_predictors()) #%>%
+              #step_pca(all_predictors(),threshold = .9) %>%
+              #step_smote(all_outcomes(), neighbors = 5)
 
 
               # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
@@ -108,13 +108,13 @@ baked_recipe <- bake(prepped_recipe, amazon_test)
 
 
 ##### Classification Random Forests #####
- 
-cl <- makePSOCKcluster(4)
-registerDoParallel(cl)
+#  
+# cl <- makePSOCKcluster(4)
+# registerDoParallel(cl)
 
 classForest_model <- rand_forest(mtry = tune(), # how many var are considered
                            min_n=tune(), # how many observations per leaf
-                           trees=1000) %>% #Type of model
+                           trees=500) %>% #Type of model
  set_engine("ranger") %>% # What R function to use
  set_mode("classification")
 
@@ -126,7 +126,7 @@ classForest_wf <- workflow() %>%
 
  ## Grid of values to tune over
  
-tuning_grid <- grid_regular(mtry(range =c(1,5)),
+tuning_grid <- grid_regular(mtry(range =c(1,1)),
                              min_n(),
                              levels = 10) ## L^2 total tuning possibilities
 
@@ -157,7 +157,7 @@ classForest_preds <- predict(final_wf, new_data=amazon_test,type="prob") %>%
 
 vroom_write(x=classForest_preds, file="./amazon_classForest.csv", delim=",")
 
-stopCluster(cl)
+# stopCluster(cl)
 ##### Naive Bayes #####
  # 
  # nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
